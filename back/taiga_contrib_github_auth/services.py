@@ -20,6 +20,7 @@ from django.db import IntegrityError
 from django.utils.translation import ugettext as _
 
 from django.apps import apps
+from django.conf import settings
 
 from taiga.base.utils.slug import slugify_uniquely
 from taiga.base import exceptions as exc
@@ -53,16 +54,19 @@ def github_register(username:str, email:str, full_name:str, github_id:int, bio:s
             user = user_model.objects.get(email=email)
             auth_data_model.objects.create(user=user, key="github", value=github_id, extra={})
         except user_model.DoesNotExist:
-            # Create a new user
-            username_unique = slugify_uniquely(username, user_model, slugfield="username")
-            user = user_model.objects.create(email=email,
-                                             username=username_unique,
-                                             full_name=full_name,
-                                             bio=bio)
-            auth_data_model.objects.create(user=user, key="github", value=github_id, extra={})
+            if settings.PUBLIC_REGISTER_ENABLED:
+                # Create a new user
+                username_unique = slugify_uniquely(username, user_model, slugfield="username")
+                user = user_model.objects.create(email=email,
+                                                username=username_unique,
+                                                full_name=full_name,
+                                                bio=bio)
+                auth_data_model.objects.create(user=user, key="github", value=github_id, extra={})
 
-            send_register_email(user)
-            user_registered_signal.send(sender=user.__class__, user=user)
+                send_register_email(user)
+                user_registered_signal.send(sender=user.__class__, user=user)
+            else:
+                return None
 
     if token:
         membership = get_membership_by_token(token)
